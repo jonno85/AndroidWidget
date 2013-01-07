@@ -191,7 +191,6 @@ public class Widget extends LinearLayout {
 		}
 
 		public void registerListener(OnTouchListener listener){
-			
 		}
 		
 		public void sendValue(){
