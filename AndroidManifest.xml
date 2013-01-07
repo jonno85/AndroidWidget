@@ -1,0 +1,37 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.firstwidget"
+    android:versionCode="1"
+    android:versionName="1.0" >
+
+    <uses-sdk
+        android:minSdkVersion="15"
+        android:targetSdkVersion="15" />
+
+    <application
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/AppTheme" >
+        
+        <!-- UnboundService -->
+        <service android:name=".unbound.UnboundService" />
+        <service android:name=".unbound.AsyncService" />
+        <service android:name=".unbound.BroadcastService" />
+        <service android:name=".unbound.WidgetIntentService" />
+        <service android:name=".bound.BinderService" />
+        <service android:name=".bound.BoundService" />
+        <service android:name=".bound.MessengerService" />
+
+        <activity
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        
+        
+    </application>
+
+</manifest>

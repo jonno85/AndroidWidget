@@ -1,0 +1,16 @@
+<resources>
+
+    <string name="app_name">FirstWidget</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="menu_settings">Settings</string>
+    <string name="title_activity_main">MainActivity</string>
+    <string name="units">units</string>
+    <string name="up">up</string>
+    <string name="down">down</string>
+
+    <string name="SEND_DATA">SEND_DATA</string>
+    <string name="SEND_DATA_DESCRIPTION">SEND_DATA_DESCRIPTION</string>
+    
+    <string name="RECEIVE_DATA">RECEIVE_DATA</string>
+    <string name="RECEIVE_DATA_DESCRIPTION">RECEIVE_DATA_DESCRIPTION</string>
+</resources>
