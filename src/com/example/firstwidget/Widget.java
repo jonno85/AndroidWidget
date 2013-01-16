@@ -183,7 +183,6 @@ public class Widget extends LinearLayout {
 		private float		textSize = 35;
 		private int			minValue = 0;
 		private int			maxValue = 100;
-		private Intent		intent;
 		private List<OnTouchListener> registeredListener = new ArrayList<OnTouchListener>();
 
 /*** CONSTRUCTORS ***/
