@@ -81,7 +81,7 @@ public class MainActivity extends Activity {
 	private Messenger		messengerServiceInbound;
 	private Message			message;
 	private boolean			mBound3 = false;
-
+	
 	class AIDLConnection implements ServiceConnection{
 
 		@Override
