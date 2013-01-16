@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
+import android.widget.SlidingDrawer;
 
 public class BroadcastService extends Service {
 
@@ -18,6 +19,7 @@ public class BroadcastService extends Service {
 	private int seed;
 	private Random r;
 	Intent intent;
+	private boolean running = true;
 	int counter = 0;
 
 
@@ -36,9 +38,11 @@ public class BroadcastService extends Service {
 
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
-		handler.removeCallbacks(sendUpdatesToUI);		
+		handler.removeCallbacks(sendUpdatesToUI);
+		
 		seed = intent.getExtras().getInt(MainActivity.TAG_SEND);
-		handler.postDelayed(sendUpdatesToUI, 2000);
+		handler.postDelayed(sendUpdatesToUI, 0);
+		
 		return START_NOT_STICKY;
 	}
 

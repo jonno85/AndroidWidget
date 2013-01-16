@@ -2,6 +2,10 @@ package com.example.firstwidget.bound;
 
 import java.util.ArrayList;
 import java.util.Random;
+import java.util.Timer;
+import java.util.TimerTask;
+
+import com.example.firstwidget.MainActivity;
 
 import android.app.Service;
 import android.content.Intent;
@@ -19,13 +23,16 @@ public class MessengerService extends Service {
 	static public final int MSG_PUT_SEED			= 3;
 	static public final int MSG_GET_VALUE			= 4;
 	static public final int MSG_GET_VALUE2			= 5;
+	static public final int MSG_RUNNING				= 6;
 	public static final String TAG = "MESSENGER SERVICE";
 	
-	private Random r;
-	private int seed;
+	private	int			run = 1;
+	private Timer		timer = new Timer("scheduled number generator");
+	private TimerTask	task;
+	private Random		r;
+	private int			seed;
 
 	private ArrayList<Messenger> mClients = new ArrayList<Messenger>();
-	//private Messenger uniqueClient;
 	/**
      * Target we publish for clients to send messages to IncomingHandler.
      */
@@ -54,28 +61,62 @@ public class MessengerService extends Service {
 
 			case MSG_PUT_SEED:
 				seed = msg.arg1;
+				r = new Random(seed);
+				timer.purge();
+				timer.scheduleAtFixedRate(getNewTimerTask(),0,
+											MainActivity.TIMERATE);
 				break;
 
 			case MSG_GET_VALUE:
-				r = new Random(seed);
 				// prepare the message to return
-				Message value = Message.obtain(null,
-												MessengerService.MSG_GET_VALUE2,
-												r.nextInt(), 0);
 				
-				//return message to every messenger's client registred
-				for(int i=mClients.size()-1; i>=0; i--){
-					try{
-						mClients.get(i).send(value);
-					} catch (RemoteException e) {
-						mClients.remove(i);
-					}
-				}
 				
+				break;
+
+			case MSG_RUNNING:
+				setRunning(msg.arg1);
 				break;
 			default:
 				super.handleMessage(msg);
 			}
+		}
+		
+		private void generateAndSend(){
+			Message value = Message.obtain(null,
+					MessengerService.MSG_GET_VALUE2,
+					r.nextInt(), 0);
+
+			//return message to every messenger's client registred
+			for(int i=mClients.size()-1; i>=0; i--){
+				try{
+					mClients.get(i).send(value);
+				} catch (RemoteException e) {
+					mClients.remove(i);
+				}
+			}
+		}
+		
+		private TimerTask getNewTimerTask(){
+			return new TimerTask() {
+				
+				@Override
+				public void run() {
+					while(run == 1){
+						try {
+							synchronized(this){
+								this.wait(MainActivity.TIMERATE);
+							}
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+						generateAndSend();
+					}
+				}
+			};
+		}
+		
+		public synchronized void setRunning(int run){
+			MessengerService.this.run = run;
 		}
 	}
 }

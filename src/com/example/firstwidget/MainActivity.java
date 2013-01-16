@@ -18,7 +18,9 @@ import android.text.TextWatcher;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.view.View.OnTouchListener;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -32,13 +34,16 @@ import com.example.firstwidget.unbound.BroadcastService;
 import com.example.firstwidget.unbound.UnboundService;
 import com.example.firstwidget.unbound.WidgetIntentService;
 import com.example.widgetservice.IBoundService;
+import com.example.widgetservice.IGeneratedValueListener;
 
 public class MainActivity extends Activity {
 
 	public static final String	TAG 		= "MainActivity";
-	public static String 		R_RECEIVER	= "receiver";
 	public static final String	TAG_SEND	= "Value";
 	public static final String	TAG_RECEIVE	= "Seed";
+	public static final String	RUNNING		= "Run";
+	public static final int		TIMERATE	= 200;
+	public static String 		R_RECEIVER	= "receiver";
 	
 	private Intent			intentUnboundService;
 	private Intent			intentBroadcastService;
@@ -56,6 +61,11 @@ public class MainActivity extends Activity {
 	private TextView		textWResult;
 	private TextView		textMResult;
 	private TextView		textIResult;
+	private Button			buttonStopService;
+	private boolean			runningService = false;
+	
+	//to manage UI jobs from thread not relative to this app space
+	private Handler handlerAIDL, handlerBinder;
 	//the only one static because call it from the messenger handler(static)
 	private static TextView	textMesResult;
 	private Intent			intent;
@@ -77,23 +87,40 @@ public class MainActivity extends Activity {
 		@Override
 		public void onServiceConnected(ComponentName name, IBinder service) {
 			boundAIDLService = IBoundService.Stub.asInterface(service);
-			//Log.i(TAG, "connected");
+			try{
+				boundAIDLService.addListener(valueGeneratedListener);
+				boundAIDLService.putSeed(widgetProgressBar.getProgress());
+			} catch(RemoteException e){
+				Log.w(TAG, "Failed to add listener", e);
+			}
 			mBound1 = true;
 		}
 
 		@Override
 		public void onServiceDisconnected(ComponentName name) {
+			try{
+				boundAIDLService.removeListener(valueGeneratedListener);
+			} catch(RemoteException e){
+				Log.w(TAG, "Failed to remove listener", e);
+			}
 			boundAIDLService = null;
 			mBound1 = false;
 		}
 		
+		private IGeneratedValueListener.Stub valueGeneratedListener = 
+							new IGeneratedValueListener.Stub() {
+			
+			@Override
+			public void handleGeneratedValue() {
+				UpdateAIDLTextView();
+			}
+		};
 	}
 
 	private ServiceConnection binderConnection = new ServiceConnection() {
 
 		@Override
 		public void onServiceDisconnected(ComponentName name) {
-			//Log.e(TAG, "service Disconnected");
 			mBound2 = false;
 		}
 
@@ -101,8 +128,15 @@ public class MainActivity extends Activity {
 		public void onServiceConnected(ComponentName name, IBinder service) {
 			LocalBinder binder = (LocalBinder) service;
 			binderService = binder.getService();
+			binderService.setGetResultBackListener(new BinderService.getResultBack() {
+				
+				@Override
+				public void newResult(int value) {
+					UpdateBinderTextView(value);
+				}
+			});
 			mBound2 = true;
-			//Log.e(TAG, "service Connected");
+			launchBinderService();
 		}
 	};
 
@@ -134,7 +168,7 @@ public class MainActivity extends Activity {
 			try {
 				message.replyTo = messengerServiceInbound;
 				messengerServiceOutbound.send(message);
-				//Log.i(TAG, "MESSENGER CONNECTION message sended OnServiceConnected");
+				launchMessengerServicePutSeed();
 			} catch (RemoteException e) {
 				e.printStackTrace();
 			}
@@ -155,7 +189,6 @@ public class MainActivity extends Activity {
 				textMesResult.setText("Messenger Bound Service Result: " + msg.arg1);
 				break;
 			default:
-				//textMesResult.setText("Messenger Bound Service Result: " + msg.arg1);
 			}
 		}
 	};
@@ -164,6 +197,10 @@ public class MainActivity extends Activity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
+
+        // handler will be bound to the current thread (UI)
+        handlerAIDL		= new Handler();
+        handlerBinder	= new Handler();
 
         mapObjectsAndListeners();
         //to auto set up service onCreate
@@ -177,22 +214,6 @@ public class MainActivity extends Activity {
         intentAsyncService.putExtra(TAG_SEND, widgetProgressBar.getProgress());
         intentBroadcastService.putExtra(TAG_SEND, widgetProgressBar.getProgress());
         intentWidgetService.putExtra(TAG_SEND, widgetProgressBar.getProgress());
-
-
-		//to get back the result through - resultReceiver - 
-		//intentUnboundService.putExtra(R_RECEIVER, new result(null));
-        //just 4 bytes for an int value
-        /* SHARED MEMORY use hide methods
-        try {
-			sharedMemory = new MemoryFile(TAG, 4);
-			sharedMemory.allowPurging(true);
-			
-			byte[] values = {40};
-			sharedMemory.writeBytes(values, 0, 0, values.length);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-        */
     }
 
     @Override
@@ -220,13 +241,7 @@ public class MainActivity extends Activity {
 	@Override
 	protected void onResume() {
 		super.onResume();
-		
-		startService(intentUnboundService);
-		startService(intentAsyncService);
-		startService(intentBroadcastService);
-		startService(intentWidgetService);
-		//startService(intentMemoryService);
-		
+
 		registerReceiver(broadcastReceiver,
 				new IntentFilter(UnboundService.BROADCAST_ACTION));
 		
@@ -238,6 +253,44 @@ public class MainActivity extends Activity {
 		
 		registerReceiver(broadcastReceiver,
 				new IntentFilter(WidgetIntentService.BROADCAST_ACTION));
+		
+		startService(intentUnboundService);
+		startService(intentAsyncService);
+		startService(intentBroadcastService);
+		startService(intentWidgetService);
+		
+		buttonStopService.setOnClickListener(new OnClickListener() {
+			
+			@Override
+			public void onClick(View v) {
+				try {
+					boundAIDLService.setServiceRunning(runningService);
+					int state = (runningService)? 1 : 0;
+					messengerServiceOutbound.send(Message.obtain(null,
+										MessengerService.MSG_RUNNING,
+										state, 0));
+					binderService.setRunning(runningService);
+				} catch (RemoteException e) {
+					Log.i("BUTTON", "IMPOSSIBLE START STOP Bound SERVICE");
+				}
+				
+				Intent runServiceStatus = new Intent(RUNNING);
+				runServiceStatus.putExtra(RUNNING, runningService);
+				
+				if(runningService){
+					buttonStopService.setText("Stop Service");
+				} else {
+					buttonStopService.setText("Start Service");
+				}
+				sendBroadcast(runServiceStatus);
+				runningService = !runningService;
+			}
+		});
+		
+		launchAIDLStartService();
+		launchMessengerServicePutSeed();
+		launchBinderService();
+		
 	}
 
 	// stop of the service and unregistering of receiver
@@ -248,13 +301,12 @@ public class MainActivity extends Activity {
 
 	@Override
 	protected void onStop() {
-		unregisterReceiver(broadcastReceiver);
 		
 		stopService(intentUnboundService);
 		stopService(intentBroadcastService);
 		stopService(intentAsyncService);
 		stopService(intentWidgetService);
-		super.onStop();
+
 		if(mBound1){
 			unbindService(BoundAIDLConnection);
 			mBound1 = false;
@@ -267,9 +319,12 @@ public class MainActivity extends Activity {
 
 		if(mBound3){
 			unbindService(messengerConnection);
-			//Log.e(TAG, "service Disconnected");
 			mBound3 = false;
 		}
+		
+		unregisterReceiver(broadcastReceiver);
+
+		super.onStop();
 	}
 	
 	/**
@@ -288,10 +343,11 @@ public class MainActivity extends Activity {
 		textMResult			= (TextView)	findViewById(R.id.textResultBound);
 		textIResult			= (TextView)	findViewById(R.id.textResultBinder);
 		textMesResult		= (TextView)	findViewById(R.id.textResultMessenger);
+		buttonStopService	= (Button)		findViewById(R.id.stopService);
 
         prevMin = Integer.parseInt(min.getText().toString());
         prevMax = Integer.parseInt(max.getText().toString());
-        
+
         units.addTextChangedListener(new TextWatcher() {
 			
 			@Override
@@ -364,23 +420,62 @@ public class MainActivity extends Activity {
 				Toast.makeText(getApplication(), "progress "+progress, Toast.LENGTH_SHORT).show();
 			}
 		});
-	
-        widgetProgressBar.OnTouchListener(new OnTouchListener() {
+
+        widgetProgressBar.setOnTouchListener(new OnTouchListener() {
 			
 			@Override
 			public boolean onTouch(View arg0, MotionEvent arg1) {
-				Log.e("TOUCH", "widgetProgressBar.OnTouchListener");
-				Toast.makeText(getApplication(), "touch ", Toast.LENGTH_SHORT);
-				return false;
+				Log.i("TOUCH", "EVENTO TOUCH ESTERNO ");
+				int progress = widgetProgressBar.getProgress();
+				int value = (progress > 0)? progress : 1;
+				
+				Context c = getBaseContext();
+				//UnboundService
+				intent = new Intent(c, UnboundService.class);
+				intent.putExtra(MainActivity.TAG_SEND, value);
+				startService(intent);
+
+				//AsyncService
+				intent = new Intent(c, AsyncService.class);
+				intent.putExtra(MainActivity.TAG_SEND, value);
+				startService(intent);
+				
+				//BroadService
+				intent = new Intent(c, BroadcastService.class);
+				intent.putExtra(MainActivity.TAG_SEND, value);
+				startService(intent);
+				
+				//WidgetIntentService
+				intent = new Intent(c, WidgetIntentService.class);
+				intent.putExtra(MainActivity.TAG_SEND, value);
+				startService(intent);
+				
+				//AIDLService
+				launchAIDLStartService();
+				//BinderService
+				launchBinderService();
+				//MessengerService
+				launchMessengerServicePutSeed();
+				
+				return true;
 			}
 		});
+		
+        OnClickListener l = new OnClickListener() {
+			
+			@Override
+			public void onClick(View v) {
+				Log.i("CLICK", "EVENTO CLICK ESTERNO ");
+			}
+		};
+		
+        widgetProgressBar.addRightClickListener(l);
 	}
 	
 	private BroadcastReceiver broadcastReceiver = new BroadcastReceiver(){
 
 		@Override
 		public void onReceive(Context context, Intent intent) {
-			launchBoundServices();
 			
 			//we dispatch different intent to correct destination
 			if(intent.getAction().equals(UnboundService.BROADCAST_ACTION)) {
@@ -391,38 +486,9 @@ public class MainActivity extends Activity {
 			}
 			if(intent.getAction().equals(BroadcastService.BROADCAST_ACTION)) {
 				updateUIBroad(intent);
-			} else {
+			}
+			if(intent.getAction().equals(WidgetIntentService.BROADCAST_ACTION)) {
 				updateWIBroad(intent);
-			}
-		}
-
-		private void launchBoundServices() {
-			if(mBound2){
-				binderService.putSeed(widgetProgressBar.getProgress());
-				textIResult.setText("Binder Bound Service Result: " + binderService.getGeneratedValue());
-			}
-			// NO SUCH METHOD ERROR
-			if(mBound1){
-				try {
-					boundAIDLService.putSeed(widgetProgressBar.getProgress());
-					textMResult.setText("AIDL Bound Service Result: " + boundAIDLService.getValue());
-				} catch (RemoteException e) {
-					e.printStackTrace();
-				}
-			}
-			//Log.e(TAG, "mBound3 " +mBound3);
-			if(mBound3){
-				
-				try {
-					messengerServiceOutbound.send(Message.obtain(null,
-											MessengerService.MSG_PUT_SEED,
-											widgetProgressBar.getProgress(), 0));
-					messengerServiceOutbound.send(Message.obtain(null,
-											MessengerService.MSG_GET_VALUE,
-											0, 0));
-				} catch (RemoteException e) {
-					e.printStackTrace();
-				}
 			}
 		}
 
@@ -451,4 +517,64 @@ public class MainActivity extends Activity {
 		}
 		
 	};
+
+	private void launchAIDLStartService(){
+		if(mBound1){
+			try {
+				boundAIDLService.putSeed(widgetProgressBar.getProgress());
+				//UpdateAIDLTextView();
+			} catch (RemoteException e) {
+				Log.e(TAG, "Failed to putSeed AIDL", e);
+			}
+		} else {
+			Log.w("SERVIZION", "NON ATTIVO");
+		}
+	}
+
+	private void launchMessengerServicePutSeed(){
+		if(mBound3){
+			try {
+				messengerServiceOutbound.send(Message.obtain(null,
+									MessengerService.MSG_PUT_SEED,
+									widgetProgressBar.getProgress(), 0));
+			} catch (RemoteException e) {
+				Log.e(TAG, "Failed to putSeed Messenger", e);
+			}
+		} else {
+			Log.w("SERVIZION", "NON ATTIVO");
+		}
+	}
+
+	private void launchBinderService(){
+		if(mBound2){
+			binderService.putSeed(widgetProgressBar.getProgress());
+		}
+	}
+	/**
+	 * Runnable that manage printing return value from out Bound Service
+	 * It uses a thread to work on UI
+	 */
+	private void UpdateAIDLTextView(){
+		handlerAIDL.post(new Runnable() {
+			
+			@Override
+			public void run() {
+				try {
+					textMResult.setText("AIDL Bound Service Result: " + boundAIDLService.getValue());
+				} catch (RemoteException e) {
+					Log.e(TAG, "ERROR while updating the UI with tweets", e);
+				}
+			}
+		});
+	}
+
+	private void UpdateBinderTextView(final int value){
+		handlerBinder.post(new Runnable() {
+			
+			@Override
+			public void run() {
+				textIResult.setText("Binder Bound Service Result: " + value);
+			}
+		});
+	}
 }

@@ -1,6 +1,8 @@
 package com.example.firstwidget.unbound;
 
 import java.util.Random;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import com.example.firstwidget.MainActivity;
 
@@ -13,6 +15,8 @@ public class AsyncService extends Service {
 	
 	private static final String TAG = "AsyncService";
 	public static final String BROADCAST_ACTION = "com.example.firstwidget.asyncservice";
+	private GreatWorker worker;
+	private ScheduledExecutorService executor;
 
 	@Override
 	public IBinder onBind(Intent intent) {
@@ -24,8 +28,10 @@ public class AsyncService extends Service {
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
 		
-		new GreatWorker().execute(intent.getExtras().getInt(MainActivity.TAG_SEND));
+		worker = new GreatWorker();
+		//worker.execute(intent.getExtras().getInt(MainActivity.TAG_SEND));
 		
+		worker.executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, intent.getExtras().getInt(MainActivity.TAG_SEND));
 		return START_NOT_STICKY;
 	}
 

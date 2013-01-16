@@ -78,15 +78,16 @@ containing a value of this type.
         public static final int stripe_bg=0x7f02000a;
     }
     public static final class id {
-        public static final int IBLeft=0x7f08000c;
-        public static final int IBRight=0x7f08000e;
-        public static final int RelativeLayout1=0x7f08000b;
+        public static final int IBLeft=0x7f08000d;
+        public static final int IBRight=0x7f08000f;
+        public static final int RelativeLayout1=0x7f08000c;
         public static final int editTextLeft=0x7f080007;
         public static final int editTextRight=0x7f080008;
         public static final int editTextUnit=0x7f080009;
-        public static final int menu_settings=0x7f08000f;
+        public static final int menu_settings=0x7f080010;
         public static final int progressBarWidget=0x7f08000a;
-        public static final int textProgressBar=0x7f08000d;
+        public static final int stopService=0x7f08000b;
+        public static final int textProgressBar=0x7f08000e;
         public static final int textResultAsync=0x7f080001;
         public static final int textResultBinder=0x7f080004;
         public static final int textResultBound=0x7f080005;

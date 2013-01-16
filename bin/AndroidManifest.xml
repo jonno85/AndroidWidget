@@ -18,7 +18,7 @@
         <service android:name=".unbound.BroadcastService" />
         <service android:name=".unbound.WidgetIntentService" />
         <service android:name=".bound.BinderService" />
-        <service android:name=".bound.BoundService" />
+        <!-- <service android:name=".bound.BoundService" />-->
         <service android:name=".bound.MessengerService" />
 
         <activity

@@ -15,7 +15,6 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.View.OnTouchListener;
 import android.view.ViewDebug.ExportedProperty;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -32,28 +31,32 @@ public class Widget extends LinearLayout {
 	private Button				buttonRight;
 	private TextProgressBar 	progressBar;
 	private OnProgressListener	progressListener;
+	private ListClickListener	leftClickListeners;
+	private ListClickListener	rightClickListeners;
 	
+/*** PERSONAL CALLBACKS ***/
 	public interface OnProgressListener{
 		public void onChangeProgress(int progress);
 	}
-	
+
 	public void setOnProgressListener(OnProgressListener l){
 		this.progressListener = l;
 	}
+/*** 					***/
 	
+/*** CONSTRUCTORS ***/
 	public Widget(Context context) {
 		super(context);
 		inflate(context);
-		setLeftClickListener();
-		setRightClickListener();
+		setClicksListeners();
 	}
 
 	public Widget(Context context, AttributeSet attrs) {
 		super(context, attrs);
 		inflate(context);
-		setLeftClickListener();
-		setRightClickListener();
+		setClicksListeners();
 	}
+/*** 			***/
 	
 	private void inflate(Context context){
 		LayoutInflater inflater = (LayoutInflater)
@@ -66,29 +69,70 @@ public class Widget extends LinearLayout {
 		buttonRight	= (Button)			findViewById(R.id.IBRight);
 	}
 	
-	public void setLeftClickListener(){
-		buttonRight.setOnClickListener(new OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				setProgress(getProgress() + 1);
-				sendValue();
-			}
-		});
-	}
-	
-	public void setRightClickListener(){
-		buttonLeft.setOnClickListener(new OnClickListener() {
+	/**
+	 * setUp the default behaviour for click events on two directions buttons
+	 */
+	private void setClicksListeners(){
+		leftClickListeners	= new ListClickListener();
+		rightClickListeners	= new ListClickListener();
+		
+		leftClickListeners.registerClickListener(new OnClickListener() {
 			@Override
 			public void onClick(View v) {
 				setProgress(getProgress() - 1);
-				sendValue();
 			}
 		});
+		
+		rightClickListeners.registerClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				setProgress(getProgress() + 1);
+			}
+		});
+		
+		buttonLeft.setOnClickListener(leftClickListeners);
+		buttonRight.setOnClickListener(rightClickListeners);
 	}
 	
-	// progress bar wrapper methods
-	public void sendValue(){
-		progressBar.sendValue();
+	public void addLeftClickListener(OnClickListener l){
+		leftClickListeners.registerClickListener(l);
+	}
+	
+	public void removeLeftClickListener(OnClickListener l){
+		leftClickListeners.unRegisterClickListener(l);
+	}
+	
+	public void addRightClickListener(OnClickListener l){
+		rightClickListeners.registerClickListener(l);
+	}
+	
+	public void removeRightClickListener(OnClickListener l){
+		leftClickListeners.unRegisterClickListener(l);
+	}
+	
+	/**
+	 * It allows to manage lists of clickListener for the same click event
+	 * @author F31999A
+	 *
+	 */
+	private class ListClickListener implements OnClickListener {
+		private List<OnClickListener> listClickListeners = new ArrayList<OnClickListener>(2);
+		
+		public void registerClickListener(OnClickListener l){
+			listClickListeners.add(l);
+		}
+		
+		public void unRegisterClickListener(OnClickListener l){
+			listClickListeners.remove(l);
+		}
+		
+		@Override
+		public void onClick(View v) {
+			for (OnClickListener click : listClickListeners) {
+				click.onClick(v);
+			}
+		}
+		
 	}
 	
 	public synchronized void setProgress(int progress) {
@@ -111,13 +155,26 @@ public class Widget extends LinearLayout {
 	public synchronized void setMaxMinValues(int max, int min){
 		progressBar.setMaxMinValue(max, min);
 	}
-
-	public void OnTouchListener(OnTouchListener l){
-		Log.e("TOUCH", "OnTouchListener");
+	
+	/**
+	 * Actually it implements a listener list phylosofy
+	 * @param l
+	 */
+	@Override
+	public void setOnTouchListener(OnTouchListener l) {
+		//super.setOnTouchListener(l);
 		progressBar.registerListener(l);
 	}
-	
-	public static class TextProgressBar extends ProgressBar implements OnTouchListener{
+
+	/**
+	 * It allows to unregister a Touchlistener
+	 * @param l
+	 */
+	public void removeOnTouchListener(OnTouchListener l){
+		progressBar.unRegisterListener(l);
+	}
+
+	public static class TextProgressBar extends ProgressBar {
 		
 		private Context		mContext;
 		private String		text = "";
@@ -127,19 +184,18 @@ public class Widget extends LinearLayout {
 		private int			minValue = 0;
 		private int			maxValue = 100;
 		private Intent		intent;
-		//public SuperListener touchListeners = new SuperListener();
+		private List<OnTouchListener> registeredListener = new ArrayList<OnTouchListener>();
 
+/*** CONSTRUCTORS ***/
 		public TextProgressBar(Context context) {
 			super(context);
 			mContext = context;
-			//this.setOnTouchListener(touchListeners);
 			setup();
 		}
 
 		public TextProgressBar(Context context, AttributeSet attrs) {
 		    super(context, attrs);
 		    mContext = context;
-		    //this.setOnTouchListener(touchListeners);
 		    setAttrs(attrs);
 		    setup();
 		}
@@ -147,10 +203,10 @@ public class Widget extends LinearLayout {
 		public TextProgressBar(Context context, AttributeSet attrs, int defStyle) {
 		    super(context, attrs, defStyle);
 		    mContext = context;
-		    //this.setOnTouchListener(touchListeners);
 		    setAttrs(attrs);
 		    setup();
 		}
+/*** 			***/
 
 		@Override
 		@ExportedProperty(category = "progress")
@@ -178,45 +234,37 @@ public class Widget extends LinearLayout {
 			super.setMax(relative_max);
 		}
 
+		/**
+		 * set the default Touch listener behaviour for the inner progressbar 
+		 */
 		private void setup(){
 			registerListener(new OnTouchListener() {
 				
 				public boolean onTouch(View v, MotionEvent event) {
-					Log.e("TOUCH", "touchListeners.registerListener");
+					Log.i("TOUCH", "EVENTO TOUCH INTERNO ");
 					setProgress((int)(((double)event.getX() / (double)getWidth()) * ((int)getMax())));
-					sendValue();
+					//sendValue();
 					return true;
 				}
 			});
 		}
 
-		public void registerListener(OnTouchListener listener){
+		/**
+		 * It allows to register more TouchListener to the same progress bar object 
+		 * @param listener
+		 */
+		private void registerListener(OnTouchListener listener){
+			Log.i("TOUCH", "Listener " + listener.toString() + " registered");
+			registeredListener.add(listener);
 		}
 		
-		public void sendValue(){
-			//BoundService (external)
-			
-			int value = (getProgress() > 0)? getProgress() : 1;
-			
-			//UnboundService
-			intent = new Intent(mContext, UnboundService.class);
-			intent.putExtra(MainActivity.TAG_SEND, value);
-			mContext.startService(intent);
-
-			//AsyncService
-			intent = new Intent(mContext, AsyncService.class);
-			intent.putExtra(MainActivity.TAG_SEND, value);
-			mContext.startService(intent);
-			
-			//BroadService
-			intent = new Intent(mContext, BroadcastService.class);
-			intent.putExtra(MainActivity.TAG_SEND, value);
-			mContext.startService(intent);
-			
-			//WidgetIntentService
-			intent = new Intent(mContext, WidgetIntentService.class);
-			intent.putExtra(MainActivity.TAG_SEND, value);
-			mContext.startService(intent);
+		/**
+		 * It allows to unregister a TouchListener from the progressbar object
+		 * @param listener
+		 */
+		private void unRegisterListener(OnTouchListener listener){
+			Log.i("TOUCH", "Listener " + listener.toString() + " UNregistered");
+			registeredListener.remove(listener);
 		}
 		
 		@Override
@@ -284,32 +332,23 @@ public class Widget extends LinearLayout {
 		 */
 		public synchronized void setUnit(String unit) {
 			this.unit = unit;
-			//UpdateText();
 			postInvalidate();
 		}
-
+		
 		@Override
-		public boolean onTouch(View arg0, MotionEvent arg1) {
-			// TODO Auto-generated method stub
-			return false;
-		}
-	}
-
-	public class SuperListener implements OnTouchListener{
-		private List<OnTouchListener> registeredListener = new ArrayList<OnTouchListener>();
-
-		private void registerListener(OnTouchListener listener){
-			Log.e("TOUCH", "registerListener " + listener.toString());
-			registeredListener.add(listener);
-		}
-
-		@Override
-		public boolean onTouch(View v, MotionEvent event) {
-			Log.e("TOUCH", "foreach");
+		public boolean dispatchTouchEvent(MotionEvent event) {
 			for(OnTouchListener listener : registeredListener){
-				listener.onTouch(v, event);
+				listener.onTouch(this, event);
 			}
-			return true;
+			return super.dispatchTouchEvent(event);
 		}
+		
+	}
+/*** TextProgressBar Class END ***/
+
+	@Override
+	public boolean dispatchTouchEvent(MotionEvent event) {
+		super.dispatchTouchEvent(event);
+		return true;
 	}
 }
