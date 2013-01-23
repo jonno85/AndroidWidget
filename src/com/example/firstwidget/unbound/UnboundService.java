@@ -34,12 +34,12 @@ public class UnboundService extends Service {
 
 	@Override
 	public IBinder onBind(Intent intent) {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
+		// intent could be null... 
 		seed	= intent.getExtras().getInt(MainActivity.TAG_SEND);
 		r		= new Random(seed);
 		task	= getNewTimerTask();
@@ -88,6 +88,7 @@ public class UnboundService extends Service {
 		};
 	}
 
+	//è più facile usare l'intent sul start command
 	private BroadcastReceiver receiver = new BroadcastReceiver() {
 		
 		@Override

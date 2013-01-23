@@ -45,7 +45,9 @@ return true;
 case TRANSACTION_handleGeneratedValue:
 {
 data.enforceInterface(DESCRIPTOR);
-this.handleGeneratedValue();
+int _arg0;
+_arg0 = data.readInt();
+this.handleGeneratedValue(_arg0);
 reply.writeNoException();
 return true;
 }
@@ -67,12 +69,13 @@ public java.lang.String getInterfaceDescriptor()
 {
 return DESCRIPTOR;
 }
-@Override public void handleGeneratedValue() throws android.os.RemoteException
+@Override public void handleGeneratedValue(int value) throws android.os.RemoteException
 {
 android.os.Parcel _data = android.os.Parcel.obtain();
 android.os.Parcel _reply = android.os.Parcel.obtain();
 try {
 _data.writeInterfaceToken(DESCRIPTOR);
+_data.writeInt(value);
 mRemote.transact(Stub.TRANSACTION_handleGeneratedValue, _data, _reply, 0);
 _reply.readException();
 }
@@ -84,5 +87,5 @@ _data.recycle();
 }
 static final int TRANSACTION_handleGeneratedValue = (android.os.IBinder.FIRST_CALL_TRANSACTION + 0);
 }
-public void handleGeneratedValue() throws android.os.RemoteException;
+public void handleGeneratedValue(int value) throws android.os.RemoteException;
 }

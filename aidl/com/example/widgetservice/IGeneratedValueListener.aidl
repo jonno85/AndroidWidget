@@ -1,5 +1,5 @@
 package com.example.widgetservice;
 
 interface IGeneratedValueListener {
-	void handleGeneratedValue();
+	void handleGeneratedValue(int value);
 }

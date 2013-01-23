@@ -111,8 +111,8 @@ public class MainActivity extends Activity {
 							new IGeneratedValueListener.Stub() {
 			
 			@Override
-			public void handleGeneratedValue() {
-				UpdateAIDLTextView();
+			public void handleGeneratedValue(int value) {
+				UpdateAIDLTextView(value);
 			}
 		};
 	}
@@ -554,16 +554,12 @@ public class MainActivity extends Activity {
 	 * Runnable that manage printing return value from out Bound Service
 	 * It uses a thread to work on UI
 	 */
-	private void UpdateAIDLTextView(){
+	private void UpdateAIDLTextView(final int value){
 		handlerAIDL.post(new Runnable() {
 			
 			@Override
 			public void run() {
-				try {
-					textMResult.setText("AIDL Bound Service Result: " + boundAIDLService.getValue());
-				} catch (RemoteException e) {
-					Log.e(TAG, "ERROR while updating the UI with tweets", e);
-				}
+				textMResult.setText("AIDL Bound Service Result: " + value);
 			}
 		});
 	}
